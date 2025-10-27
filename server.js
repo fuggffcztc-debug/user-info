@@ -64,7 +64,7 @@ function saveData() {
 
 loadData();
 
-app.post('https://admin-dashboard-s4rw.onrender.com/submit-eligibility', (req, res) => {
+app.post('/submit-eligibility', (req, res) => {
   try {
     const userData = {
       id: Date.now(),
@@ -109,7 +109,7 @@ app.post('https://admin-dashboard-s4rw.onrender.com/submit-eligibility', (req, r
   }
 });
 
-app.post('https://admin-dashboard-s4rw.onrender.com/admin/login', (req, res) => {
+app.post('/admin/login', (req, res) => {
   const { password } = req.body;
   
   if (password === ADMIN_PASSWORD) {
