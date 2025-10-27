@@ -1,70 +1,49 @@
+// server.js
 const express = require('express');
 const bodyParser = require('body-parser');
-const fs = require('fs');
+const admin = require('firebase-admin');
 const path = require('path');
 
 const app = express();
-const PORT = 5000;
-const DATA_FILE = path.join(__dirname, 'data.json');
+const PORT = process.env.PORT || 5000;
 const ADMIN_PASSWORD = '3462';
 
+// 🌍 Allowed frontend origins
 const ALLOWED_ORIGINS = [
   'https://admin-dashboard-s4rw.onrender.com',
   'https://fintechloans-ke.onrender.com'
 ];
 
+// 🔥 Initialize Firebase (uses Render environment variable)
+admin.initializeApp({
+  credential: admin.credential.cert(
+    JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
+  ),
+});
+
+const db = admin.firestore();
+const usersCollection = db.collection('users');
+
+// ✅ CORS setup
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  
   if (ALLOWED_ORIGINS.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
   }
-  
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  
+  if (req.method === 'OPTIONS') return res.status(200).end();
   next();
 });
 
+// ✅ Middleware
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname));
 
-let users = [];
-
-function loadData() {
-  try {
-    if (fs.existsSync(DATA_FILE)) {
-      const data = fs.readFileSync(DATA_FILE, 'utf8');
-      users = JSON.parse(data);
-      console.log(`Loaded ${users.length} users from data.json`);
-    } else {
-      users = [];
-      saveData();
-      console.log('Created new data.json file');
-    }
-  } catch (error) {
-    console.error('Error loading data:', error);
-    users = [];
-  }
-}
-
-function saveData() {
-  try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(users, null, 2), 'utf8');
-    console.log(`Saved ${users.length} users to data.json`);
-  } catch (error) {
-    console.error('Error saving data:', error);
-  }
-}
-
-loadData();
-
-app.post('/submit-eligibility', (req, res) => {
+// ✅ Submit eligibility form
+app.post('/submit-eligibility', async (req, res) => {
   try {
     const userData = {
       id: Date.now(),
@@ -87,31 +66,29 @@ app.post('/submit-eligibility', (req, res) => {
       incomeType: req.body.incomeType,
       income: req.body.income,
       monthlyExpenses: req.body.monthlyExpenses,
-      purpose: req.body.purpose
+      purpose: req.body.purpose,
     };
 
-    users.push(userData);
-    saveData();
+    const docRef = await usersCollection.add(userData);
 
-    console.log(`New application received from: ${userData.fullName}`);
-    
-    res.json({ 
-      success: true, 
+    console.log(`✅ New application received from: ${userData.fullName}`);
+    res.json({
+      success: true,
       message: 'Application submitted successfully',
-      userId: userData.id
+      userId: docRef.id,
     });
   } catch (error) {
-    console.error('Error processing submission:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error processing your application' 
+    console.error('❌ Error processing submission:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error processing your application',
     });
   }
 });
 
+// ✅ Admin login
 app.post('/admin/login', (req, res) => {
   const { password } = req.body;
-  
   if (password === ADMIN_PASSWORD) {
     res.json({ success: true });
   } else {
@@ -119,33 +96,40 @@ app.post('/admin/login', (req, res) => {
   }
 });
 
-app.get('/admin/users', (req, res) => {
+// ✅ Fetch all users
+app.get('/admin/users', async (req, res) => {
   const { password } = req.query;
-  
-  if (password === ADMIN_PASSWORD) {
-    res.json({ success: true, users: users });
-  } else {
-    res.status(401).json({ success: false, message: 'Unauthorized' });
+  if (password !== ADMIN_PASSWORD)
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  try {
+    const snapshot = await usersCollection.orderBy('timestamp', 'desc').get();
+    const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json({ success: true, users });
+  } catch (error) {
+    console.error('❌ Error fetching users:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
-app.get('/admin/user/:id', (req, res) => {
+// ✅ Fetch single user
+app.get('/admin/user/:id', async (req, res) => {
   const { password } = req.query;
-  
-  if (password === ADMIN_PASSWORD) {
-    const user = users.find(u => u.id === parseInt(req.params.id));
-    if (user) {
-      res.json({ success: true, user: user });
-    } else {
-      res.status(404).json({ success: false, message: 'User not found' });
-    }
-  } else {
-    res.status(401).json({ success: false, message: 'Unauthorized' });
+  if (password !== ADMIN_PASSWORD)
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  try {
+    const doc = await usersCollection.doc(req.params.id).get();
+    if (!doc.exists)
+      return res.status(404).json({ success: false, message: 'User not found' });
+
+    res.json({ success: true, user: { id: doc.id, ...doc.data() } });
+  } catch (error) {
+    console.error('❌ Error fetching user:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server is running on http://0.0.0.0:${PORT}`);
-  console.log(`Admin dashboard: http://0.0.0.0:${PORT}/admin.html`);
-  console.log(`Total applications: ${users.length}`);
+  console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
 });
