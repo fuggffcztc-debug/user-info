@@ -1,0 +1,20 @@
+{
+  "name": "techspace-finance-backend",
+  "version": "1.0.0",
+  "description": "Backend server for Techspace Finance loan eligibility system",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "loan",
+    "finance",
+    "backend"
+  ],
+  "author": "Techspace Finance",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.20.3",
+    "express": "^4.21.2"
+  }
+}
