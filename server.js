@@ -9,8 +9,8 @@ const DATA_FILE = path.join(__dirname, 'data.json');
 const ADMIN_PASSWORD = '3462';
 
 const ALLOWED_ORIGINS = [
-  'https://swiftcapitalportal.onrender.com',
-  'https://tinyurl.com/Swiftloanlmtd'
+  'https://admin-dashboard-s4rw.onrender.com',
+  'https://fintechloans-ke.onrender.com'
 ];
 
 app.use((req, res, next) => {
@@ -64,7 +64,7 @@ function saveData() {
 
 loadData();
 
-app.post('/submit-eligibility', (req, res) => {
+app.post('https://admin-dashboard-s4rw.onrender.com/submit-eligibility', (req, res) => {
   try {
     const userData = {
       id: Date.now(),
@@ -109,7 +109,7 @@ app.post('/submit-eligibility', (req, res) => {
   }
 });
 
-app.post('/admin/login', (req, res) => {
+app.post('https://admin-dashboard-s4rw.onrender.com/admin/login', (req, res) => {
   const { password } = req.body;
   
   if (password === ADMIN_PASSWORD) {
